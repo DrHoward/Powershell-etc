@@ -1,0 +1,262 @@
+
+#####################
+# Powershell Global #
+#####################
+
+# Help or Manual pages with Examples
+man gwmi -examples  ## help
+
+# List Global Aliases
+alias | findstr /i ps  ## Get-Alias
+
+# List all Commands
+gcm  ## Get-Command
+
+# List Environment Variables
+gci env:  ## Get-ChildItem/dir
+Set-Item -path env:TEAMS -value ($env:TEAMS + "finance")
+
+# List Available Modules
+gmo -listavailable  ## Get-Module
+
+# List Module Commands
+gcm -module webadministration  ## Get-Command
+
+# List Roles and Features Installed
+ipmo servermanager; get-windowsfeature | findstr '\[X\]'
+
+
+##############
+# Formatting #
+##############
+
+# User Input (read [-p])
+$input = read-host "Choose an option: "
+
+# Limit Output per Page (less/more)
+gci -r | more
+
+# Send Output to File
+cat file.txt | Out-File [-append]  ## >
+
+# Pipe Output to File (tee)
+get-process | tee-object -file C:\output.txt
+
+# Format Output in Columns or List (column -t)
+dir | findstr "dll" | format-list
+ps powershell | format-table -AutoSize -Wrap 
+
+# Sort Output by Column
+dir | sort-object lastwritetime
+
+# Trim/Select Output (head/tail)
+gci | select -first 10
+gci | select -last 10
+gci | select -skip 1
+
+# Pattern Matching (grep [-o|-v])
+gci -r | findstr /i "string"
+dir | ?{ $_ -match "dll|exe" }  ## NOT case-sensitive
+dir | ?{ $_ -notmatch "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}" }  ## exclude
+cat file.txt | select-string -not "^$|^#"
+
+# Exclude Newline (echo -n)
+$output | write-host -nonewline
+
+# Replace Strings (sed/replace)
+ps | foreach{$_ -replace "abc", "def"}	
+cat file.txt | %{ $a = $_ -replace "\s+", " "; $parts = $a.split(); $parts[1] }
+
+# Count Lines (wc -l)
+dir | measure-object  ## total entries
+echo $orderedlist | group-object  ## sorted list
+
+# Split Columns (awk/cut)
+dir | %{ $_.fullname.split('\')[-1].split('.')[0] }
+
+# Sum all Fields in a Column
+cat .\test.csv | %{ [int]$total+=$_.Split(',')[2]; } ; Write-Host "Total: $total"  ## Get-Content
+
+# Number of Matches of a Pattern
+Get-Content .\test.csv | %{ $a=$_.Split(','); Write-Host "Total Fields"$a[0]"="$a.length; }
+
+
+#########
+# Logic #
+#########
+
+# For Loop (for)
+dir | foreach { echo $_ }
+dir | %{ echo $_ }
+
+# Test if File Exists (-f|-d|-e)
+test-path file.txt
+
+# Time Duration of Command
+measure-command { ps | out-host }
+## OR
+{ps | out-null}; $cmd = get-history -count 1; $cmd.endexecutiontime - $cmd.startexecutiontime
+
+# Sleep Delay
+start-sleep 3; ps
+
+
+##############
+# Filesystem #
+##############
+
+# Locate File or Directory (find)
+gci -rec | ?{ $_ -match "[a-z]+\.[a-z]+" }  ## Where-Object
+
+# Disk Usage / List all Drives
+gdr -psprovider 'filesystem'  ## Get-PSDrive
+gwmi –query "select * from win32_logicaldisk where DriveType = '3'"  ## Get-WmiObject
+
+# Disk Usage (du)
+dir -rec C:\subdir | %{ $total += $_.length }; write-host "Total: $total";  ## SLOW
+
+# Process List
+ps
+## OR 
+proc = subprocess.Popen([echo 'hello'], stdout=subprocess.PIPE, shell=True)
+(out.err) = proc.communicate()
+print out
+
+# Run an executable (eg. ./script.ps1)
+&$env:plesk_bin\dbclient
+&${env:plesk_bin}\dbclient.exe
+"$env:plesk_bin\dbclient.exe"
+"&$env:plesk_bin\dbclient.exe"
+
+# Pass Argument Array to Executable
+$arglist = @('-arg1', 'C:\path', '-arg2', 'file.txt')
+& 'application.exe' $arglist
+
+
+###########
+# Network #
+###########
+
+# Network Statistics
+netstat -oaf | ?{ $_ -notmatch "UDP" }  ## -b to show EXE 
+netstat -es  ## Sent/Received/Errors + Statistics per protocol
+netstat -r  ## Routing table
+
+# Search the Firewall
+(new-object -comobject hnetcfg.fwpolicy2).rules | ?{ $_.enabled -eq $true } | ?{ $_.remoteaddresses -match $ip }
+
+# Download URL
+(new-object system.net.webclient).downloadfile($url, $path)
+
+# Execute Remote Commands
+set-executionpolicy remotesigned -force; 
+(new-object System.Net.WebClient).DownloadFile('https://files.hostname.com/script.ps1', 'C:\filedir\script.ps1'); 
+'C:\filedir\script.ps1';
+rm 'C:\filedir\script.ps1'; 
+
+# Add DNS zones back to MSDNS
+dir "$env:windir\System32\dns\*.dns" | %{
+$zone = $_.name -replace ".dns$", ""; echo "loading $zone..."; dnscmd /zoneadd $zone /primary /load; }
+
+# Mitigate SYN Flood
+New-Item "HKLM:\system\currentcontrolset\services\tcpip\parameters"  ## -Force to delete first
+New-ItemProperty -Path "HKLM:\system\currentcontrolset\services\tcpip\parameters" -Name 'synattackprotect' -Value 1 -PropertyType "DWORD" -Force
+New-ItemProperty -Path "HKLM:\system\currentcontrolset\services\tcpip\parameters" -Name 'tcpmaxconnectresponseretransmissions' -Value 2 -PropertyType "DWORD" -Force
+New-ItemProperty -Path "HKLM:\system\currentcontrolset\services\tcpip\parameters" -Name 'tcpmaxdataretransmissions' -Value 3 -PropertyType "DWORD" -Force
+New-ItemProperty -Path "HKLM:\system\currentcontrolset\services\tcpip\parameters" -Name 'enablepmtudiscovery' -Value 0 -PropertyType "DWORD" -Force
+
+
+###########
+# Objects #
+###########
+
+# Determine Object Type
+(pwd).gettype()  ## Object[]
+(pwd|out-string).gettype()  ## String
+
+# List all Object Properties
+ps powershell | format-list -property *
+
+# List Properties of the Object Type
+ps powershell | gm  ## Get-Member
+(ps powershell).gettype() | gm  ## same thing
+
+# Typecast - Force Type as an Array/String
+[string](dir)  ## String
+dir | out-string  ## String
+$procs = @($str)  ## Object[]
+
+
+#######
+# IIS #
+#######
+
+# Import IIS Module
+ipmo webadministration  ## Import-Module
+
+# List all Sites
+gci IIS:\Sites | select-object name,applicationpool,physicalpath,state | format-table -autosize
+
+# List all Applicaiton Pools
+gci IIS:\AppPools | select-object name,managedruntimeversion,managedpipelinemode,state | format-table -autosize
+
+# List all Application Pool users
+dir IIS:\apppools | select name | %{ write-host $_.name"- "$_.processmodel.username }
+
+# Restart an Application Pool
+(get-item "IIS:\AppPools\$pool").Start()
+
+# Generate Application Pool password
+Add-Type -Assembly System.Web
+$pass = [Web.Security.Membership]::GeneratePassword(16,5)
+
+# Reset Application Pool user password
+net user "$identity" "$pass"
+Set-ItemProperty "IIS:\AppPools\$pool" -name processModel -value @{userName="$identity";password="$pass";identitytype=3}
+
+# Show High Usage of Process (eg. w3wp.exe)
+&${env:windir}\system32\inetsrv\appcmd.exe list wp | %{ $a=$_.replace('"','').split(' '); ps -id $a[1]; $a[2] }  ## Ugly format
+
+# Add bindings to existing site
+gci IIS:\Sites | %{ $_.name } | ?{ $_ -match "[a-zA-Z0-9\.]+\.[a-zA-Z]+" } \
+	| %{ $binding="*:80:webmail." + $_; \
+	&${env:windir}\system32\inetsrv\appcmd.exe" set site \
+	/site.name:"webmail(horde)" \
+	/+"bindings.[protocol='http',bindingInformation='$binding']" }
+
+
+#########
+# Plesk #
+#########
+
+# Show Plesk Version
+type $env:plesk_dir\version
+
+# Show Available Plesk Versions
+&$env:plesk_dir\admin\bin\ai.exe --show-all-releases
+
+# Upgrade to Latest or Specified Version
+&$env:plesk_bin\ai.exe --select-product-id panel --select-release-current --reinstall-patch --install-component base
+&$env:plesk_bin\dbupgrade.exe --upgrade --from-version=9.5.4 --to-version=10.4.4
+## Repeat for every major version
+
+# Retrieve/Set Plesk Admin Password
+&$env:plesk_bin\plesksrvclient -get
+&$env:plesk_bin\plesksrvclient -set PASSWORD
+
+# Plesk Database (psa) Tables
+dir $env:plesk_dir\MySQL\Data\psa\*.frm | %{ $_.name.replace('.frm','') }
+
+# Plesk Debug Mode
+&$env:plesk_dir\admin\conf\panel.ini  ## rename panel.ini.sample
+
+
+############
+# Registry #
+############
+
+# Add New Registry Entry
+New-Item "HKLM:\SYSTEM\CurrentControlSet\XYZ"  ## -Force to delete/recreate folder
+New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\XYZ" -Name Enabled -Value 0 -PropertyType "DWORD" -Force 
+
+
